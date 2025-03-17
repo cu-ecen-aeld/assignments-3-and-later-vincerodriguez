@@ -16,6 +16,14 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int ret; 
+    ret = system(cmd); 
+    if(ret == -1)
+    {
+        perror("system call failed");
+        return false; 
+    }
+
 
     return true;
 }
@@ -47,7 +55,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 /*
  * TODO:
@@ -58,6 +66,38 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+
+    pid_t pid; 
+    pid = fork(); //Start child process 
+    if(pid == -1)
+    {
+        perror("fork failed");
+        return false; 
+    }
+    else if (pid==0) //Child process
+    {
+        execv(command[0], command); //Execute command and should not reutrn becuase its its own process now 
+        perror("execv");
+        exit(1);  
+    }
+    else // Parent Process 
+    {
+        int status; 
+        wait(&status); 
+
+        if(WIFEXITED(status))
+        {
+            int exit_status = WEXITSTATUS(status); 
+            printf("Child exited with status %d\n", exit_status);
+            return exit_status == 0; //Only return true if exit status was 0 
+        }
+        else{
+            printf("Child did not exit properly\n"); 
+            return false; 
+        }
+    }
+
+
 
     va_end(args);
 
@@ -92,6 +132,51 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+
+    pid_t pid; 
+    int fd = open(outputfile, O_WRONLY | O_TRUNC | O_CREAT, 0644); 
+    if(fd < 0)
+    {
+        perror("open"); 
+        close(fd);
+        return false; 
+    }
+    switch(pid = fork())
+    {
+        case -1: 
+            perror("fork"); 
+            close(fd); 
+            return false;
+        case 0: 
+            if(dup2(fd, 1) < 0) 
+            {
+                perror("dup2"); 
+                close(fd);
+                exit(1); 
+            }
+            close(fd); 
+
+            execv(command[0], command); 
+            perror("execv failed"); 
+            exit(1); 
+        default:
+            int status; 
+            wait(&status); 
+
+            if(WIFEXITED(status))
+            {
+                int exit_status = WEXITSTATUS(status); 
+                printf("Child exited with status %d\n", exit_status);
+                return exit_status == 0; //Only return true if exit status was 0 
+            }
+            else{
+                printf("Child did not exit properly\n"); 
+                return false; 
+            } 
+    }
+
+
+
 
     va_end(args);
 
